@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_4bb309f4_8ce5_4c14_8b81_ae24a35d98ae_Output_Variables_theatreDetails = Any
+

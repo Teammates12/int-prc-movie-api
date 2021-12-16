@@ -1,0 +1,78 @@
+#%RAML 1.0
+title: Bookmyshow
+
+types:
+  movies: !include datatypes/movies.raml
+  city: !include datatypes/city.raml
+  theatre: !include datatypes/theatre.raml
+  seatlist: !include datatypes/seatlist.raml
+ 
+traits:
+  client-id-required:
+    headers:
+      client_id: 
+       type: string
+      client_secret:
+        type: string
+      
+      
+/home:
+  /getallcities:
+    get:
+      description: will list all cities 
+      responses:
+        200:
+          body:
+            application/json:
+              example: 
+                output: !include examples/city.raml
+                
+  
+  /{selectcity}:
+   get:
+    description: will display movies
+            
+    responses:
+        200:
+          body:
+            application/json:
+              examples: 
+                output: !include examples/movies.raml
+  /selectmovie:
+   get:
+    description: will display all theatres 
+    queryParameters: 
+      name:
+        displayName: M_id
+        required: True
+      name1:
+        displayName: C_id
+        required: True
+    responses:
+      200:
+        body:
+           application/json:
+             example: !include /examples/theatrelist.raml
+               
+
+
+
+  /selecttheatre:
+   get:
+    description: will display seats availability
+    queryParameters:
+      name:
+        displayName: T_id
+        required: True
+      name1:
+        displayName: M_id
+        required: True
+    responses:
+        200:
+         body:
+           application/json:
+             examples: !include examples/seatslist.raml
+                   
+                    
+          
+          

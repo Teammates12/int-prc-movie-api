@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd">
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="5cb1bc4e-3175-4535-b387-8fcaa64210d8" >
+		<http:request-connection host="int-sys-movie-api-v1.us-e2.cloudhub.io" />
+	</http:request-config>
+	<flow name="SlotDetails" doc:id="2fab2f62-cc70-44ac-be0f-e99ac740e69b" >
+		<http:request method="GET" doc:name="Get Availability Slots" doc:id="44226570-75a1-4fbf-bf7a-285d9a16949e" config-ref="HTTP_Request_configuration" path="/api/availibility">
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	T_ID : attributes.queryParams.name,
+	M_ID : attributes.queryParams.name1
+}]]]></http:query-params>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="ff5af7ea-46c3-46ba-b41b-b76bf9feac41" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="getAllCities" doc:id="4c28954d-a0ba-4023-862e-c89c161484dc" >
+		<http:request method="GET" doc:name="Get All Cities" doc:id="f362b420-17c4-41ef-879a-bcd0727cd272" config-ref="HTTP_Request_configuration" path="/api/city/allcities"/>
+		<ee:transform doc:name="Transform Message" doc:id="9fedd418-b5bd-436e-84aa-1b71edceabda" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	city : payload01.C_NAME
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="GetMovieDetails" doc:id="37a1229d-a2df-47bf-94f6-6fc9b0b30949" >
+		<http:request method="GET" doc:name="Get CID from City Name" doc:id="f5038642-c9f8-4639-8d89-35c8a49af7e7" config-ref="HTTP_Request_configuration" path="#['/api/city/' ++ attributes.uriParams.selectcity]" target="city">
+		</http:request>
+		<http:request method="GET" doc:name="Get Theartre from CID" doc:id="cefae445-5bcf-4557-905d-27e97cba7ebd" config-ref="HTTP_Request_configuration" path="#['/api/theatre/gettheatrebycid/' ++ vars.city[0].C_ID]" target="theatreDetails">
+		</http:request>
+		<http:request method="GET" doc:name="Get Movie Ids" doc:id="c2a597ce-636f-4046-a02b-0d3070242545" config-ref="HTTP_Request_configuration" path="#['/api/availibility/' ++ vars.theatreDetails[0].THEATRE_ID]" target="movieIds">
+		</http:request>
+		<set-variable value="#[[]]" doc:name="Set Variable" doc:id="7f737a43-2280-41c4-80e6-c6f9b0eef18e" variableName="accVar"/>
+		<foreach doc:name="For Each" doc:id="eb77e9d7-7b8c-443d-ad3e-95afa86fbf59" collection="#[vars.movieIds]">
+			<http:request method="GET" doc:name="Request" doc:id="24ecf46f-08cb-4263-a7fd-2acc42353663" config-ref="HTTP_Request_configuration" path="#['/api/movie/' ++ payload.M_ID]" target="movieDetails">
+			</http:request>
+			<set-variable value="#[output application/json&#10;---&#10;vars.accVar + (vars.movieDetails[0])]" doc:name="Set Variable" doc:id="685aec4e-0d31-46a8-bea6-e7143eac2b58" variableName="accVar"/>
+		</foreach>
+		<set-payload value="#[output application/json&#10;---&#10;vars.accVar]" doc:name="Set Payload" doc:id="5d07d3d7-6d99-462c-a08c-c51689171d53" />
+	</flow>
+	<flow name="GetTheatreList" doc:id="4bb309f4-8ce5-4c14-8b81-ae24a35d98ae" >
+		<http:request method="GET" doc:name="Get Theartre from CID" doc:id="8d542b15-0742-443a-8e44-3655aba41b9f" config-ref="HTTP_Request_configuration" path="/api/availibility/moviecity" target="theatreDetails">
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"C_ID" : attributes.queryParams.C_ID,
+	"M_ID" : attributes.queryParams.M_ID
+}]]]></http:query-params>
+
+		</http:request>
+		<set-variable value="#[[]]" doc:name="Set Variable" doc:id="add78658-4bdb-4f31-894b-87cc48efe74f" variableName="accVars"/>
+		<foreach doc:name="For Each" doc:id="644f9d48-3794-470f-bd05-4772f5cb823b" collection="#[vars.accVars]">
+			<set-variable value="#[(vars.counter - 1) as Number]" doc:name="Real Counter" doc:id="a4768f9a-70a8-4911-ab43-79f9c4f9e021" variableName="realcounter"/>
+			<http:request method="GET" doc:name="Get Theatre Name" doc:id="5316fe71-b73c-4581-80d9-3ae4a1024ee3" config-ref="HTTP_Request_configuration" path="#['/api/theatre/' ++ vars.accVars[vars.realcounter].TheatreID]" target="theatre"/>
+			<set-variable value="#[output application/json&#10;---&#10;vars.accVars ++ (vars.theatre[0])]" doc:name="Set Variable" doc:id="4de94591-59f9-4946-ab89-5b29a671397e" variableName="accVars2"/>
+		</foreach>
+		<set-payload value="#[output application/json&#10;---&#10;vars.accVars2]" doc:name="Set Payload" doc:id="fdaef20e-80e2-4941-8bfa-60bb089cdfcd" />
+	</flow>
+</mule>
