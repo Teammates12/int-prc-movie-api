@@ -1,0 +1,23 @@
+request:
+  host: "nse-data1.p.rapidapi.com"
+  rapid-api-key: "acd154b6f6mshb6047153d3174a6p1a2c3ajsn2f23d88f80b9"
+
+db:
+  url: "jdbc:postgresql://castor.db.elephantsql.com:5432/avrwrhai"
+  driver: "org.postgresql.Driver"
+  user: "avrwrhai"
+  password: "EvClTwpg0tCqnpo2OFS5qXw_hH7nRefc"
+  
+sns:
+  test: "arn:aws:sns:us-east-1:930134717763:stockMarket.fifo"
+  access-key: "AKIA5RECZOVBQBCYBNM2"
+  secret-key: "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"
+  
+sqs:
+  arn: "arn:aws:sqs:us-east-1:930134717763:stockQueue.fifo"
+  access-key: "AKIA5RECZOVBRVIPSDRV"
+  secret-key: "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"
+  
+twilio:
+  username: "ACa9686b27c69385f27352438001c859f9"
+  password: "073b27351a711f69aee745d2022e12c1"

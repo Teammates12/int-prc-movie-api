@@ -1,0 +1,19 @@
+#%RAML 1.0
+title: int-prc-stockalert-api
+
+types:  
+  stock: !include datatype/stock.raml
+
+traits:
+  client_id_trait: !include traits/headerTrait.raml
+  errorTrait: !include traits/errorTrait.raml
+
+/stocks:
+  get:
+    is: [client_id_trait,errorTrait]
+    responses:
+      200:
+        body:
+          application/json:
+            example: !include examples/stockMarket.json
+              

@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_8c70f33f_9762_4268_ada0_97077cd0e014_Output_Variables_stocks = Any
+

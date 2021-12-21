@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_8c70f33f_9762_4268_ada0_97077cd0e014_Input_Variables_stockThreshold = Array<{|  c_id?: String,   stock_id?: String,   threshold?: String,   trajectory?: String|}>
+

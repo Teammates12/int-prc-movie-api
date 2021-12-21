@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:twilio="http://www.mulesoft.org/schema/mule/twilio"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:sqs="http://www.mulesoft.org/schema/mule/sqs"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sqs http://www.mulesoft.org/schema/mule/sqs/current/mule-sqs.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/twilio http://www.mulesoft.org/schema/mule/twilio/current/mule-twilio.xsd">
+	<flow name="pushNotifications" doc:id="d073da96-a0f3-42d2-91ee-b1c91fdb490e" >
+		<sqs:receivemessages doc:name="Receive messages" doc:id="ddaafa89-f429-43a2-89ca-a3c95748c93e" config-ref="Amazon_SQS_Configuration" queueUrl="https://sqs.us-east-1.amazonaws.com/930134717763/stockQueue"/>
+		<set-variable value="#[payload]" doc:name="Set message" doc:id="ee1a1246-edbb-4b48-a359-192c819fa554" variableName="message"/>
+				<set-variable value='#[output application/java&#10;---&#10;trim((((payload splitBy("C_ID:"))[1]) splitBy(","))[0])]' doc:name="Set Customer Id" doc:id="25cd716e-0604-4bc7-be18-720cf50efdd1" variableName="c_id"/>
+		<logger level="INFO" doc:name="Logger" doc:id="e82d427f-e938-4f0c-bb8c-8d4f819da5e1" message="#[payload]"/>
+		<db:select doc:name="Get Customer Details" doc:id="33616b00-2631-423b-a6cc-68ee676c05c2" config-ref="Database_Config" target="customer">
+			<db:sql ><![CDATA[select * from customer_stock where c_id = :c_id]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+"c_id" : vars.c_id
+}]]]></db:input-parameters>
+		</db:select>
+		<choice doc:name="Choice for Medium" doc:id="5e51fcd9-8513-42d2-b9ee-a16a8a7247a8">
+					<when expression='#[vars.customer.medium[0] == "SMS"]'>
+						<ee:transform doc:name="From To &amp; Message Body" doc:id="fdbdae3d-55e2-46d9-8a51-a4cea1816eaf">
+							<ee:message>
+								<ee:set-payload><![CDATA[%dw 2.0
+output application/x-www-form-urlencoded
+---
+{
+"To": vars.customer.contact[0] as String,
+"MessagingServiceSid" : "MG2377473561c3afc499954cbf9669a7d0",
+"Body": vars.message
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<try doc:name="Try" doc:id="e03dce5f-c9d4-4f73-8488-99d7c18a4b7a">
+							<twilio:create20100401-accounts-messagesjson-by-account-sid doc:name="Send Message SMS" doc:id="48f102e9-9acc-4a66-8bd9-5dc59b822359" config-ref="Twilio_Connector_Config" accountSid="ACa9686b27c69385f27352438001c859f9"/>
+							<error-handler>
+								<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="6c51062b-6b42-49f4-a2e3-93881a20f95a" type="TWILIO:BAD_REQUEST, TWILIO:CLIENT_ERROR, TWILIO:CONNECTIVITY, TWILIO:INTERNAL_SERVER_ERROR, TWILIO:NOT_FOUND, TWILIO:SERVER_ERROR, TWILIO:SERVICE_UNAVAILABLE, TWILIO:TIMEOUT, TWILIO:TOO_MANY_REQUESTS, EXPRESSION">
+									<logger level="INFO" doc:name="Logger" doc:id="832c3647-0eae-45a6-a51a-3d0dbdd213ec" message="#[payload]"/>
+							<ee:transform doc:name="Message Not Send" doc:id="d44a759e-925f-4504-95fd-f077e5a08f67">
+										<ee:message>
+											<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+"message": "Not able to send Message through Twilio!"
+}]]></ee:set-payload>
+										</ee:message>
+									</ee:transform>
+								</on-error-propagate>
+							</error-handler>
+						</try>
+					</when>
+					<otherwise>
+						<ee:transform doc:name="From To &amp; Message Body" doc:id="211994d1-b85d-4754-ba1a-715481eaf464">
+							<ee:message>
+								<ee:set-payload><![CDATA[%dw 2.0
+output application/x-www-form-urlencoded
+---
+using( data= vars.message)
+{
+	"To": "whatsapp:" ++ vars.customer.contact[0] as String,
+	"From": "whatsapp:+14155238886",
+	"MessagingServiceSid": "MG2377473561c3afc499954cbf9669a7d0",
+	"Body": data
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<try doc:name="Try" doc:id="0eb1a96e-e403-4171-a55d-ead8204ae5aa">
+							<twilio:create20100401-accounts-messagesjson-by-account-sid doc:name="Send Message Whatsapp" doc:id="83b73bc2-7e2c-41e5-9156-5792da890014" config-ref="Twilio_Connector_Config" accountSid="ACa9686b27c69385f27352438001c859f9"/>
+					<error-handler>
+								<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="25dc56bf-dbd3-41a3-a71c-ba3dff343d94" type="TWILIO:BAD_REQUEST, TWILIO:CLIENT_ERROR, TWILIO:CONNECTIVITY, TWILIO:INTERNAL_SERVER_ERROR, TWILIO:NOT_FOUND, TWILIO:SERVER_ERROR, TWILIO:SERVICE_UNAVAILABLE, TWILIO:TIMEOUT, TWILIO:TOO_MANY_REQUESTS, EXPRESSION">
+									<ee:transform doc:name="Message Not Send" doc:id="011bcff0-68a3-4fc8-abef-f65129097267">
+										<ee:message>
+											<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+"message": "Not able to send Message through Twilio!"
+}]]></ee:set-payload>
+										</ee:message>
+									</ee:transform>
+								</on-error-propagate>
+							</error-handler>
+						</try>
+					
+</otherwise>
+		</choice>
+		<ee:transform doc:name="Transform Message" doc:id="98168784-035c-425c-a633-2b0f8a49d4d4" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="5a3b5ee9-e3be-407a-b5a8-e4a593074570" type="ANY">
+				<ee:transform doc:name="Error" doc:id="3f92bfcb-6a14-4e93-a824-0fd0d6fdedf0" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"message":"Error getting data to send!"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	</mule>

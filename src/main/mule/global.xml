@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:sns="http://www.mulesoft.org/schema/mule/sns" xmlns:sqs="http://www.mulesoft.org/schema/mule/sqs"
+	xmlns:twilio="http://www.mulesoft.org/schema/mule/twilio"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/twilio http://www.mulesoft.org/schema/mule/twilio/current/mule-twilio.xsd
+http://www.mulesoft.org/schema/mule/sqs http://www.mulesoft.org/schema/mule/sqs/current/mule-sqs.xsd
+http://www.mulesoft.org/schema/mule/sns http://www.mulesoft.org/schema/mule/sns/current/mule-sns.xsd">
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="2751bd54-cada-48ee-8cf8-0420d3c1523a" >
+		<http:request-connection host="${request.host}" protocol="HTTPS"/>
+	</http:request-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="a0765a85-6d3e-454e-849d-98c5cf4a9b69" file="config.yaml" />
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="10bfadb9-925b-4233-a1f9-00eb8123ce81" >
+		<db:generic-connection url="${db.url}" driverClassName="${db.driver}" user="${db.user}" password="${db.password}" />
+	</db:config>
+	<twilio:config name="Twilio_Connector_Config" doc:name="Twilio Connector Config" doc:id="7b0e6f4a-efd9-403d-b4e7-696e1f830006" >
+		<twilio:account-sid-auth-token-connection username="${twilio.username}" password="${twilio.password}" />
+	</twilio:config>
+	<sqs:config name="Amazon_SQS_Configuration" doc:name="Amazon SQS Configuration" doc:id="dbef5fed-a86b-4850-a12a-b8b19dbe4c24" >
+		<sqs:basic-connection testQueueArn="${sqs.arn}" accessKey="${sqs.access-key}" secretKey="${sqs.secret-key}" />
+	</sqs:config>
+	<sns:config name="Amazon_SNS_configuration" doc:name="Amazon SNS configuration" doc:id="46850922-16ff-4691-90b0-dd4ab16576d3" >
+		<sns:basic-connection testTopic="${sns.test}" accessKey="${sns.access-key}" secretKey="${sns.secret-key}" />
+	</sns:config>
+</mule>

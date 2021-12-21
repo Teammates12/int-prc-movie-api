@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:sqs="http://www.mulesoft.org/schema/mule/sqs" xmlns:sns="http://www.mulesoft.org/schema/mule/sns"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/sns http://www.mulesoft.org/schema/mule/sns/current/mule-sns.xsd
+http://www.mulesoft.org/schema/mule/sqs http://www.mulesoft.org/schema/mule/sqs/current/mule-sqs.xsd">
+	<flow name="pushStocks" doc:id="0104ae27-aec0-44e4-8983-445d8fe165f8" >
+		<ee:cache doc:name="Cache" doc:id="e592f54f-4c8d-4afe-957d-fd418646f676" >
+			<http:request method="GET" doc:name="Request" doc:id="d4f1d9d4-b02b-4dce-8a68-ee4a9d8b8606" config-ref="HTTP_Request_configuration" path="/all_indices" target="stocks">
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"x-rapidapi-key" : "acd154b6f6mshb6047153d3174a6p1a2c3ajsn2f23d88f80b9",
+	"x-rapidapi-host" : "nse-data1.p.rapidapi.com"
+}]]]></http:headers>
+			</http:request>
+		</ee:cache>
+		<set-variable value="#[output application/json&#10;---&#10;vars.stocks.body.data]" doc:name="stockValues" doc:id="dc32ccb5-273e-4d77-8f7e-ef057976b358" variableName="stockValues"/>
+		<sns:list-topics doc:name="List topics" doc:id="6cf9d5e5-7437-492b-b39f-f6b954a0b453" config-ref="Amazon_SNS_configuration"/>
+		<ee:transform doc:name="Get Topic Name" doc:id="750ce08a-54c0-498d-9bc9-1da7899839b1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map(value, index) ->
+     (value.*payload[0] splitBy(":"))[-1]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="listTopics" doc:id="4dec12af-d5e2-4ea9-b51b-b045b5bc2cdb" variableName="listTopics"/>
+		<foreach doc:name="For Each" doc:id="9808b542-d58b-4732-adca-582df2b52041" collection="#[vars.stockValues]">
+			<flow-ref doc:name="checkIfTopicExists" doc:id="27a88e88-2b6c-499e-86fa-f8ba8205074a" name="checkIfTopicExists" />
+			<set-variable value="#[payload]" doc:name="Set Stock Date" doc:id="9a5bb654-7910-4ebb-8bd8-568a4aed7ca0" variableName="stockData"/>
+			<flow-ref doc:name="PushMessageToSQS" doc:id="183a702a-618c-4816-84c9-f288d4be5ae7" name="PushMessageToSQS"/>
+			
+		</foreach>
+	</flow>
+	<sub-flow name="checkIfTopicExists" doc:id="0dd5c8b0-e493-438c-aad4-f594d910b495">
+	<logger level="INFO" doc:name="Logger" doc:id="b209a381-ed79-4b2e-94ab-e1c6bf6df794" message='#[payload.index replace " " with("-")]'/>
+		<choice doc:name="Choice to check Topic is created or not" doc:id="185f9b44-5a27-41bc-aad5-f94aa7f6431c" >
+				<when expression='#[not (vars.listTopics contains (payload.index replace " " with("-")))]'>
+					<db:insert doc:name="Insert" doc:id="1914851d-5b80-496c-a659-916b64746ace" config-ref="Database_Config" target="insert">
+					<db:sql><![CDATA[INSERT INTO stock values(:s_name,:s_value) ]]></db:sql>
+					<db:input-parameters><![CDATA[#[{
+s_name : payload.index,
+s_value : payload.last
+}]]]></db:input-parameters>
+				</db:insert>
+					<sns:create-topic doc:name="Create topic" doc:id="51124345-8507-4f7d-a902-e517249d58cf" config-ref="Amazon_SNS_configuration" topicName='#[(payload.index as String)  replace " " with("-")]' target="createTopicResponse"/>
+				
+</when>
+			<otherwise>
+					<logger level="INFO" doc:name="Topic Exists" doc:id="1325d6e2-ede2-46c0-ac20-e35eb61dfcc9" message='"Topic Exists Already"'/>
+				</otherwise>
+			</choice>
+		</sub-flow>
+	<sub-flow name="PushMessageToSQS" doc:id="8c70f33f-9762-4268-ada0-97077cd0e014">
+	<logger level="INFO" doc:name="Logger" doc:id="0a7fbd96-c080-4d73-8014-2e0b29f17be6" message="#[vars.stockData.percentChange]"/>
+		<db:select doc:name="Get Customer Stock Threshold" doc:id="617b4d40-2272-481c-889c-9e80b765d365" config-ref="Database_Config" target="stockThreshold">
+			<db:sql><![CDATA[SELECT * FROM stock_threshold where stock_name= :stock_name]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	"stock_name": payload.index
+}]]]></db:input-parameters>
+		</db:select>
+			<foreach doc:name="For Each" doc:id="abd2ba6c-0c43-4a83-aab6-2062d74ed8fd" collection="#[vars.stockThreshold]">
+				<choice doc:name="Choice" doc:id="dad753e7-f605-4168-a71d-b59f7189396a" >
+					<when expression='#[vars.stockData.percentChange &gt;= payload.threshold]'>
+						<ee:transform doc:name="Transform Message" doc:id="fdbb4c10-af2f-4d3e-94d0-0f9c02b791fe" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+    "body":"StockName:" ++" " ++ vars.stockData.index ++ "," ++ "PercentInc:" ++ vars.stockData.percentChange ++ "," ++ "High: " ++ vars.stockData.high ++", "++ "Low:" ++ vars.stockData.low
+  	++", "++ "C_ID:" ++ payload.c_id ++ "," ++ "CurrentPrice:" ++ vars.stockData.last
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<sqs:send-message doc:name="Send message" doc:id="de051821-fc56-4ad5-861c-fa86487550ee" config-ref="Amazon_SQS_Configuration" queueUrl="https://sqs.us-east-1.amazonaws.com/930134717763/stockQueue"/>
+						
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="Threshold not crossed" doc:id="24d4b086-afbf-4fa4-84e3-b1471f9e8a15" message="Threshold not crossed"/>
+					</otherwise>
+				</choice>
+			</foreach>
+	</sub-flow>
+</mule>
